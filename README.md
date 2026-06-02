@@ -1,161 +1,84 @@
-# 🚀 NexusLearn — Next-Gen Learning Dashboard
+# Next-Gen Learning Dashboard
 
-A high-fidelity, **dark-mode-only** student dashboard built for the Frontend Intern Challenge. It pairs a hardware-accelerated, zero-layout-shift UI with **server-rendered** course data fetched live from Supabase.
+This is my submission for the frontend intern challenge. It's a student dashboard that shows your courses, a daily learning streak, and an activity graph. The course data is not hardcoded — it comes from a Supabase database.
 
-**Stack:** Next.js 15 (App Router) · Supabase (`@supabase/ssr`) · Tailwind CSS · Framer Motion · lucide-react · TypeScript
+**Live site:** _add your Vercel link here_
 
----
+## What I used
 
-## ✨ Highlights
+- Next.js 15 (App Router)
+- Supabase (for the database)
+- Tailwind CSS (for styling)
+- Framer Motion (for the animations)
+- Lucide React (for the icons)
+- TypeScript
 
-- **Server Components for data** — courses are fetched on the server with `@supabase/ssr`; the anon key never gates writes (Row Level Security does), and no secret ever reaches the client bundle.
-- **Streaming + Suspense** — the shell, hero, and activity tiles paint instantly while the course tiles stream in behind a `<Suspense>` boundary with **pulsing skeleton loaders** that hold their exact footprint (no layout shift on swap).
-- **Bento grid** with a slim, collapsible sidebar.
-- **Multi-page App Router navigation** — the sidebar links to real server-rendered routes (`/`, `/courses`, `/activity`, `/achievements`, `/settings`); the shared shell lives in the root layout so the sidebar persists and the `layoutId` highlight animates *across* navigations.
-- **Framer Motion throughout** — staggered entrance, spring-physics hover, animated progress bars (via `scaleX`, not `width`), and a `layoutId` navigation highlight.
-- **Zero layout shift** — every animation uses `transform`/`opacity` only.
-- **Fully responsive** — full rail (desktop) → icons-only rail (tablet) → bottom nav (mobile).
+## How to run it
 
----
+1. Install the packages:
+   ```
+   npm install
+   ```
 
-## 🧱 Architecture & the Server/Client split
+2. Make a file called `.env.local` in the main folder and put your Supabase keys in it. You can look at `.env.example` to see what goes there:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=your-project-url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   ```
 
-The guiding rule: **fetch on the server, animate on the client.**
+3. Set up the database. Open the SQL Editor in Supabase and run the code in `supabase/seed.sql`. This makes the `courses` table and adds a few demo courses.
 
-```
-app/
-  layout.tsx            ← Server: <html> + persistent DashboardShell (sidebar)
-  page.tsx              ← Server: overview grid + Suspense (force-dynamic)
-  loading.tsx           ← Server: content-area skeleton
-  error.tsx             ← Client: graceful error boundary + retry
-  courses/page.tsx      ← Server: full course grid (force-dynamic)
-  activity/page.tsx     ← Server: stats + contribution graph
-  achievements/page.tsx ← Server: badge grid
-  settings/page.tsx     ← Server: preferences + profile
+4. Start the app:
+   ```
+   npm run dev
+   ```
+   Then open http://localhost:5500 in your browser.
 
-components/dashboard/
-  DashboardShell.tsx    ← Client: sidebar collapse state + MotionConfig
-  Sidebar.tsx           ← Client: next/link nav, usePathname, layoutId highlight
-  MainArea.tsx          ← Server: shared <main> + page header
-  BentoGrid.tsx         ← Client: CSS grid + stagger orchestrator
-  CourseSection.tsx     ← Server (async): awaits Supabase, catches errors
-  CourseList.tsx        ← Client: stagger container (display: contents)
-  CourseTile.tsx        ← Client: icon + progress + gradient mesh
-  HeroTile.tsx          ← Client: greeting + streak
-  ActivityTile.tsx      ← Client: contribution graph
-  ActivityBoard.tsx     ← Client: activity stats + graph
-  AchievementsGrid.tsx  ← Client: badge tiles
-  SettingsPanel.tsx     ← Client: toggles + profile
-  StatTile.tsx          ← Client: KPI tile with count-up
-  ProgressBar.tsx       ← Client: scaleX fill + count-up
-  BentoTile.tsx         ← Client: shared <article> shell (hover + entrance)
-  skeletons.tsx         ← Server: skeleton loaders
+## How I split the server and client parts
 
-lib/
-  supabase/server.ts    ← request-scoped server client (cookies)
-  data/courses.ts       ← server-only data access (getCourses)
-  types.ts              ← Course + Database TypeScript interfaces
-  icons.ts              ← tree-shakeable lucide icon registry
-```
+The main idea I followed was: **get the data on the server, do the animations on the client.**
 
-**Why these boundaries?**
+- The pages (like the home page and the courses page) are Server Components. They get the course data from Supabase on the server side. I did it this way because it's safer (the database code never goes to the browser) and the challenge asked for Server Components.
+- That data is then passed down to small client components (the files that start with `"use client"`). These handle the things that need to react to the user — the sidebar, the cards, the progress bars, and all the animations.
+- I used `<Suspense>` so the page shows up straight away, and a loading skeleton appears where the courses will be until the data finishes loading.
+- The sidebar is in the main layout, so it stays on screen when you move between pages and the little highlight slides over to whatever page you're on.
 
-- `app/page.tsx` is a **Server Component**. It renders the static structure and drops the data-dependent area inside `<Suspense fallback={<CourseTilesSkeleton/>}>`.
-- `CourseSection` is an **async Server Component** — it `await`s `getCourses()` (Supabase) on the server and passes a **typed** `Course[]` down as props.
-- Anything that needs interactivity or animation (`"use client"`) — sidebar, tiles, progress bars — lives at the **leaves** of the tree, receiving already-fetched data as props. Client components never import the Supabase client.
-- The shell uses the **children-as-prop** pattern: `DashboardShell` (client) wraps `{children}` (the server-rendered `<main>`), so making the shell interactive doesn't force the data fetch onto the client.
+So in short: the server does the data, and the client does the moving parts.
 
-### Animation strategy (and how layout shift is avoided)
+## The database
 
-| Interaction | Technique | Why it's shift-free |
-|---|---|---|
-| Tile entrance | `opacity` + `y` (transform) with `staggerChildren` | transform/opacity only — composited |
-| Tile hover | `whileHover={{ scale: 1.02 }}`, `spring(300/20)` | `scale` is a transform; border-tint + glow are color/opacity (no mask repaints) |
-| Progress bar | `scaleX` 0→target, `transform-origin: left` | never animates `width` (no layout) |
-| Sidebar highlight | `layoutId` shared element | FLIP-based, GPU transforms |
-| Skeletons | `opacity` keyframe pulse | identical box model to real tiles |
+There is one table called `courses`. It has these columns:
 
-`MotionConfig reducedMotion="user"` makes all of the above respect the OS "reduce motion" setting.
+- `id` — a uuid
+- `title` — the course name
+- `progress` — a number from 0 to 100
+- `icon_name` — which icon to show on the card
+- `created_at` — the date it was added
 
----
+The code to create it is in `supabase/seed.sql`. I also turned on Row Level Security and only allowed reading. That's why it's okay to use the key in the browser — people can read the courses but they can't change them.
 
-## 🗄️ Database
+## The animations
 
-`courses` table:
+I used Framer Motion for all of it:
 
-| column | type | notes |
-|---|---|---|
-| `id` | `uuid` | primary key, `gen_random_uuid()` |
-| `title` | `text` | e.g. "Advanced React Patterns" |
-| `progress` | `integer` | 0–100 (checked) |
-| `icon_name` | `text` | a lucide icon name, e.g. "Atom" |
-| `created_at` | `timestamptz` | default `now()` |
+- The cards fade in one after the other when the page loads.
+- When you hover a card it grows a tiny bit, using spring physics so it feels natural.
+- The progress bars fill up from 0 to the real number.
+- The sidebar highlight slides between the menu items using `layoutId`.
 
-Run [`supabase/seed.sql`](./supabase/seed.sql) in the Supabase **SQL Editor**. It creates the table, enables **Row Level Security with public read-only access** (this is what makes shipping the anon key safe), and seeds 4 courses.
+I only animated `transform` and `opacity` so the layout never jumps around while things move.
 
----
+## Problems I ran into
 
-## ⚙️ Getting started
+- **It felt choppy at first.** The animations were not smooth in the beginning. I found out that some CSS was slowing it down — like the blur effect behind every card and a fancy gradient border. I removed those and used lighter effects instead, and it got a lot smoother.
+- **Loading the courses with an animation.** I wanted the course cards to fade in right when they load from the database. It was a bit tricky because the data comes from the server but the animation happens on the client, so I split it into two pieces — one part fetches the data and the other part animates it.
+- **The progress bar was making the page jump.** Animating the `width` caused the layout to shift, so I used `scaleX` instead, which doesn't do that.
+- **Database errors.** If the database fails to load, I didn't want the whole page to break. So I show a small error message just on the courses section and the rest of the dashboard still works.
 
-```bash
-# 1. Install
-npm install
+## Things I'd add if I had more time
 
-# 2. Configure env (never commit the real file)
-cp .env.example .env.local
-#   → fill in NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
-#     from Supabase → Project Settings → API
+- Real login so it shows your own data
+- More live data on the other pages
+- Saving the settings toggles
 
-# 3. Seed the database
-#   → paste supabase/seed.sql into the Supabase SQL Editor and run it
-
-# 4. Run
-npm run dev        # http://localhost:5500
-```
-
-Other scripts: `npm run build`, `npm run start`, `npm run lint`.
-
-### Environment variables
-
-| Variable | Required | Description |
-|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Your Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Public anon key (safe to expose under RLS) |
-
-Both are `NEXT_PUBLIC_*` because the anon key is designed to be public and is protected by RLS. The **`service_role` key is never used** in this project — keep it out of the repo.
-
----
-
-## ☁️ Deploying to Vercel
-
-1. Push to a public GitHub repo.
-2. Import the repo in Vercel.
-3. Add the two environment variables (same names as above) in **Project → Settings → Environment Variables**.
-4. Deploy. The dashboard route is `force-dynamic`, so it renders per request with fresh Supabase data.
-
----
-
-## 🧗 Challenges & decisions
-
-- **Streaming a server fetch *into* a client stagger.** Course tiles need (a) server-side Supabase fetching and (b) a Framer stagger that fires the moment data arrives. Solved by fetching in `CourseSection` (server) and handing the data to `CourseList` (client), which uses `display: contents` so its `<article>`s become **direct Bento-grid children** while it still orchestrates their stagger.
-- **No layout shift on the progress bar.** Animating `width` repaints/relayouts. Switched to `scaleX` with a left transform-origin so the fill is purely composited, with the percentage counting up in lockstep via a `MotionValue`.
-- **Hydration-safe mock data.** The contribution graph's intensities come from a deterministic 32-bit integer hash (no `Math.random`/`Date`) so server and client markup match exactly.
-- **Graceful errors at two levels.** `CourseSection` catches DB failures and renders an inline error tile (the rest of the dashboard stays alive); `app/error.tsx` backstops anything unexpected with a retry.
-- **Responsive sidebar without layout thrash.** The rail is in-flow and animates its own `width`; `DashboardShell` syncs collapse state to a `matchMedia` query so tablets get icons-only and mobile swaps to a bottom nav.
-- **Chasing a *buttery* 60fps.** The first pass looked great but felt choppy. Profiling surfaced three repaint hotspots: `backdrop-blur` on every tile (re-blurred each hover/scroll frame), a `mask-composite` gradient border (a CPU repaint whose cost scaled with tile size — worst on the large activity tile), and `background-attachment: fixed` (full-page repaint on scroll). Fixes: solid tile backgrounds, a hover **border-color tint + opacity glow** in place of the mask, and the ambient glow moved to a single fixed, GPU-composited `body::before` layer. The 98-cell activity graph also dropped its per-cell entrance springs in favour of one tile-level reveal. Net result: only `transform`/`opacity` animate, and nothing forces synchronous layout or paint.
-
----
-
-## ✅ Requirement checklist
-
-- [x] Next.js App Router + **Server Components** for data
-- [x] Supabase via `@supabase/ssr`, env vars handled securely (`.env.example`, no secrets committed)
-- [x] `loading.tsx` **and** `<Suspense>` skeletons with pulse animation
-- [x] Graceful DB error handling
-- [x] Bento grid, slim collapsible sidebar, hero/course/activity tiles
-- [x] Semantic HTML (`nav`, `main`, `article`, `section`, `header`, `footer`) — no div soup
-- [x] Framer Motion: staggered load, spring hover (`stiffness: 300, damping: 20`), `layoutId` highlight
-- [x] Dynamic lucide icon from `icon_name`, animated 0→value progress bar, gradient-mesh card background
-- [x] Zero layout shift (transform/opacity only)
-- [x] TypeScript interfaces for Supabase payloads
-- [x] Responsive: desktop / tablet (icons) / mobile (bottom nav)
+The theme is dark only, like the challenge asked for.
