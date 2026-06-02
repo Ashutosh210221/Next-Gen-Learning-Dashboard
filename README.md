@@ -70,7 +70,7 @@ lib/
 | Interaction | Technique | Why it's shift-free |
 |---|---|---|
 | Tile entrance | `opacity` + `y` (transform) with `staggerChildren` | transform/opacity only — composited |
-| Tile hover | `whileHover={{ scale: 1.02 }}`, `spring(300/20)` | `scale` is a transform; glow is `opacity` |
+| Tile hover | `whileHover={{ scale: 1.02 }}`, `spring(300/20)` | `scale` is a transform; border-tint + glow are color/opacity (no mask repaints) |
 | Progress bar | `scaleX` 0→target, `transform-origin: left` | never animates `width` (no layout) |
 | Sidebar highlight | `layoutId` shared element | FLIP-based, GPU transforms |
 | Skeletons | `opacity` keyframe pulse | identical box model to real tiles |
@@ -142,6 +142,7 @@ Both are `NEXT_PUBLIC_*` because the anon key is designed to be public and is pr
 - **Hydration-safe mock data.** The contribution graph's intensities come from a deterministic 32-bit integer hash (no `Math.random`/`Date`) so server and client markup match exactly.
 - **Graceful errors at two levels.** `CourseSection` catches DB failures and renders an inline error tile (the rest of the dashboard stays alive); `app/error.tsx` backstops anything unexpected with a retry.
 - **Responsive sidebar without layout thrash.** The rail is in-flow and animates its own `width`; `DashboardShell` syncs collapse state to a `matchMedia` query so tablets get icons-only and mobile swaps to a bottom nav.
+- **Chasing a *buttery* 60fps.** The first pass looked great but felt choppy. Profiling surfaced three repaint hotspots: `backdrop-blur` on every tile (re-blurred each hover/scroll frame), a `mask-composite` gradient border (a CPU repaint whose cost scaled with tile size — worst on the large activity tile), and `background-attachment: fixed` (full-page repaint on scroll). Fixes: solid tile backgrounds, a hover **border-color tint + opacity glow** in place of the mask, and the ambient glow moved to a single fixed, GPU-composited `body::before` layer. The 98-cell activity graph also dropped its per-cell entrance springs in favour of one tile-level reveal. Net result: only `transform`/`opacity` animate, and nothing forces synchronous layout or paint.
 
 ---
 
