@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-ink-950 text-slate-200 antialiased;
+  }
+
+  /* Ambient glow on its own fixed, GPU-composited layer. Using a fixed
+     pseudo-element (instead of `background-attachment: fixed` on <body>) means
+     the gradients are painted once and never repaint while the page scrolls —
+     no scroll jank. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    transform: translateZ(0);
+    background-image:
+      radial-gradient(60rem 60rem at 12% -10%, rgba(56, 189, 248, 0.14), transparent 60%),
+      radial-gradient(48rem 48rem at 100% 0%, rgba(34, 211, 238, 0.1), transparent 55%),
+      radial-gradient(50rem 50rem at 50% 120%, rgba(59, 130, 246, 0.12), transparent 60%);
+  }
+
+  /* Thin, theme-matched scrollbars. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme("colors.ink.600") transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-ink-600;
+  }
+
+  ::selection {
+    background: rgba(34, 211, 238, 0.35);
+    color: #fff;
+  }
+}
+
+@layer utilities {
+  /* Faint dot-grid texture that sits behind tile content. */
+  .bg-grain {
+    background-image: radial-gradient(
+      rgba(255, 255, 255, 0.04) 1px,
+      transparent 1px
+    );
+    background-size: 16px 16px;
+  }
+}
